@@ -18,22 +18,8 @@ URLS = [
     "https://www.bayut.com/for-sale/property/dubai/jumeirah-lake-towers/cluster-f/"
 ]
 
-# Local file to track sent listings
-SENT_FILE = "sent_listings.json"
-
-
-def load_sent():
-    """Load already-sent listings from file."""
-    if os.path.exists(SENT_FILE):
-        with open(SENT_FILE, "r") as f:
-            return json.load(f)
-    return []
-
-
-def save_sent(sent):
-    """Save sent listings to file."""
-    with open(SENT_FILE, "w") as f:
-        json.dump(sent, f)
+# Temp memory in environment (GitHub Actions can't persist files across runs easily)
+sent_links = set(json.loads(os.environ.get("SENT_LINKS", "[]")))
 
 
 def send_whatsapp(message):
@@ -73,18 +59,19 @@ def scrape_bayut(url):
 
 
 def main():
-    sent = load_sent()
-    new_sent = sent.copy()
+    global sent_links
+    new_sent_links = set(sent_links)
 
     for url in URLS:
         listings = scrape_bayut(url)
         for listing in listings:
-            if listing["link"] not in sent:
+            if listing["link"] not in sent_links:
                 message = f"🏠 {listing['title']}\n💰 {listing['price']}\n🔗 {listing['link']}"
                 send_whatsapp(message)
-                new_sent.append(listing["link"])
+                new_sent_links.add(listing["link"])
 
-    save_sent(new_sent)
+    # Print new set for next run (manual carryover)
+    print("::set-output name=SENT_LINKS::" + json.dumps(list(new_sent_links)))
 
 
 if __name__ == "__main__":
